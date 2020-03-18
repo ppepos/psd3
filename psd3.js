@@ -230,6 +230,7 @@ psd3.Pie.prototype.draw = function(svg, totalRadius, dataset, originalDataset, o
                 clone = Object.assign({}, entry);
             }
 
+		    console.log(entry);
             if (clone && entry.drilldown != null) {
                 // if the object has drilldowns, filter the list of drilldown
                 var drilldown = recursiveFilter(entry.drilldown, predicate);
