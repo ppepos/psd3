@@ -210,6 +210,51 @@ psd3.Pie.prototype.draw = function(svg, totalRadius, dataset, originalDataset, o
         _this.reDrawPie(d, originalDataset);
     };
 
+    var rclick = function(d) {
+        var updatedDataset = recursiveFilter(originalDataset, function(data) {
+            return data !== d.data;
+        });
+        _this.reDrawPieAfterRemove(updatedDataset);
+    };
+
+
+    // Adapted from https://codereview.stackexchange.com/a/154187
+    var recursiveFilter = function(data, predicate) {
+
+        // if no data is sent in, return null, otherwise transform the data
+        return !!!data ? null : data.reduce(function(list, entry) {
+
+            var clone = null;
+            if (predicate(entry)) {
+                // if the object matches the filter, clone it as it is
+                clone = Object.assign({}, entry);
+            }
+
+            if (clone && entry.drilldown != null) {
+                // if the object has drilldowns, filter the list of drilldown
+                var drilldown = recursiveFilter(entry.drilldown, predicate);
+                if (drilldown.length > 0) {
+                    // if any of the drilldown matches, clone the parent object, overwrite
+                    // the drilldown list with the filtered list
+                    clone = Object.assign({}, entry, {
+                        drilldown: drilldown
+                    });
+                } else {
+                    delete clone.drilldown;
+                }
+
+            }
+
+            // if there's a cloned object, push it to the output list
+            if (clone) {
+                list.push(clone);
+            }
+
+            return list;
+        }, []);
+
+    };
+
     var arc = d3.svg.arc().innerRadius(innerRadius)
         .outerRadius(outerRadius);
     //Set up groups
@@ -231,6 +276,10 @@ psd3.Pie.prototype.draw = function(svg, totalRadius, dataset, originalDataset, o
         .attr("class", "arc " + clazz)
         .attr("transform",
             "translate(" + (totalRadius) + "," + (totalRadius) + ")")
+        .on("contextmenu", function(d) {
+            d3.event.preventDefault();
+            rclick(d);
+        })
         .on("dblclick", dblclick);
 
     var gradient = svg.append("svg:defs")
@@ -301,12 +350,12 @@ psd3.Pie.prototype.draw = function(svg, totalRadius, dataset, originalDataset, o
             a[0] = arc.centroid(d)[0] - parentCentroid[0];
             a[1] = arc.centroid(d)[1] - parentCentroid[1];
             var rotate = "";
-            if(_this.config.rotateLabel === true){
+            if (_this.config.rotateLabel === true) {
                 var rotateAngle = (d.endAngle + d.startAngle) / 2 * (180 / Math.PI) + 90;
                 //console.log("rotateAngle = " + rotateAngle);
                 var b = [];
                 b[0] = parentCentroid[0];
-                b[1] = parentCentroid[1];    
+                b[1] = parentCentroid[1];
                 rotate = "rotate( " + rotateAngle + ", " + b + ")";
             }
             return "translate(" + a + ")" + rotate;
@@ -328,6 +377,19 @@ psd3.Pie.prototype.draw = function(svg, totalRadius, dataset, originalDataset, o
     }
 
 
+};
+
+psd3.Pie.prototype.reDrawPieAfterRemove = function(ds) {
+    d3.select("#" + _this.tooltipId).remove();
+    d3.select("#" + _this.config.containerId + "_svg") //.remove();
+        .transition()
+        .ease(_this.config.drilldownTransition)
+        .duration(_this.config.drilldownTransitionDuration)
+        .style("height", 0)
+        .remove()
+        .each("end", function() {
+            _this.drawPie(ds);
+        });
 };
 
 psd3.Pie.prototype.reDrawPie = function(d, ds) {
